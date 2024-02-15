@@ -25,8 +25,5 @@ conn.request(
     ),
     {"Content-type": "application/x-www-form-urlencoded"},
 )
-res = conn.getresponse()
-print(res)
-
-# TODO: If the response includes if I clicked the link, that'd be cool
+conn.getresponse()
 # TODO: when I eventually automate this, I need to make sure I don't emit multiple api calls at once

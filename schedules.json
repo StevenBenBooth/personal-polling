@@ -1,0 +1,18 @@
+{
+  "schedule-info": [
+    {
+      "file": "mood.py",
+      "frequency": "daily",
+      "repetition-probs": {
+        "0": 0.2,
+        "1": 0.3,
+        "2": 0.3,
+        "3": 0.2
+      },
+      "time_bounds": {
+        "start": "0900",
+        "end": "2300"
+      }
+    }
+  ]
+}

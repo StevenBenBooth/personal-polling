@@ -9,7 +9,7 @@
         "2": 0.3,
         "3": 0.2
       },
-      "time_bounds": {
+      "time-bounds": {
         "start": "0900",
         "end": "2300"
       }

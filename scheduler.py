@@ -1,25 +1,15 @@
-# TODO: This should somehow compute the schedule for data collection, and set up cron jobs accordingly (?)
-
-# How should I compute times?
 import json
 import os
+import subprocess
+import itertools
 import pandas as pd
 import numpy as np
+
 
 from datetime import datetime, date, time, timedelta
 
 
 # TODO: reimplement interval handling with portion
-
-
-# class AllowedRange:
-#     def __init__(self, start_time, end_time):
-#         self.start = start_time
-#         self.end = end_time
-
-#     def contains(self, element):
-#         # Should I try to convert element to a datetime object to check for inclusion?
-#         pass
 
 
 def interval_deletion(intervals, invalid_interval):
@@ -100,40 +90,63 @@ def get_random_times(day, num=1, time_bounds=None, buffer=None):
     return res
 
 
-with open("schedules.json") as f:
-    schedules = json.load(f)["schedule-info"]
+def register_task(filename, dt, taskname):
+    ps_time = dt.strftime("%I:%M%p").lower()
+    # Format %-I is invalid on windows
+    if ps_time[0] == "0":
+        ps_time = ps_time[1:]
 
-today = date.today()
+    ps_day = dt.strftime("%A")
+    task_trigger = f"New-ScheduledTaskTrigger -Once -DaysOfWeek {ps_day} -At {ps_time}"
+    task_action = f'New-ScheduledTaskAction -Execute "Powershell" -Argument "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force .venv/Scripts/Activate.ps1; python {filename};" -WorkingDirectory $PSScriptRoot'
+    ps_command = f'$taskTrigger = {task_trigger}; $taskAction = {task_action}; Register-ScheduledTask "{taskname}" -Action $taskAction -Trigger $taskTrigger -TaskPath "PersonalPolling";'
+    subprocess.call(f"C:\Windows\System32\powershell.exe {ps_command}", shell=True)
 
-# TODO: for high frequency events, random.choice will scale too slowly
-for schedule in schedules:
-    file = os.path.join("api-calls", schedule["file"])
-    repetition_dist = schedule["repetition-probs"]
-    if schedule["frequency"] == "daily":
-        days = list(pd.date_range(today, periods=7))
 
-        time_bounds = {
-            k: datetime.strptime(v, "%H%M").time()
-            for k, v in schedule["time-bounds"].items()
-        }
+def main():
+    with open("schedules.json") as f:
+        schedules = json.load(f)["schedule-info"]
 
-        nums = np.random.choice(
-            list(map(lambda x: int(x), repetition_dist.keys())),
-            p=list(repetition_dist.values()),
-            size=(len(days),),
-        )
-        print(nums)
-        try:
-            datetimes = [
-                get_random_times(day, num, time_bounds, buffer=60)
-                for day, num in zip(days, nums)
-            ]
-        except Exception as e:
-            raise Exception(
-                f"There was an issue selected a valid set of times! {str(e)}"
+    today = date.today()
+
+    # TODO: for high frequency events, random.choice will scale too slowly
+    for schedule in schedules:
+        file = os.path.join("api-calls", schedule["file"])
+        repetition_dist = schedule["repetition-probs"]
+        if schedule["frequency"] == "daily":
+            days = list(pd.date_range(today, periods=7))
+
+            time_bounds = {
+                k: datetime.strptime(v, "%H%M").time()
+                for k, v in schedule["time-bounds"].items()
+            }
+
+            nums = np.random.choice(
+                list(map(lambda x: int(x), repetition_dist.keys())),
+                p=list(repetition_dist.values()),
+                size=(len(days),),
             )
-    else:
-        raise NotImplementedError("Only daily schedules are currently supported")
 
-    # TODO: implement scheduling here
-    print(datetimes)
+            try:
+                datetimes = list(
+                    itertools.chain.from_iterable(
+                        [
+                            get_random_times(day, num, time_bounds, buffer=60)
+                            for day, num in zip(days, nums)
+                        ]
+                    )
+                )
+            except Exception as e:
+                raise Exception(
+                    f"There was an issue selected a valid set of times! {str(e)}"
+                )
+        else:
+            raise NotImplementedError("Only daily schedules are currently supported")
+
+        # TODO: implement scheduling here
+        for dt in datetimes:
+            register_task(file, dt, f"Run {file}")
+
+
+if __name__ == "__main__":
+    main()

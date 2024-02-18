@@ -5,11 +5,17 @@ import pickle
 import itertools
 import pandas as pd
 import numpy as np
+import pytz
 
 
 from datetime import datetime, date, timedelta
 
 # TODO: reimplement interval handling with portion
+
+BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+VENV_PATH = os.path.join(BASE_PATH, ".venv", "Scripts", "Activate.ps1")
+
+LOCALTIMEZONE = pytz.timezone("America/New_York")
 
 
 def interval_deletion(intervals, invalid_interval):
@@ -80,7 +86,11 @@ def get_random_times(day, num=1, time_bounds=None, buffer=None):
             minute_selected -= next_size
             next_size = sizes[i]
         actual_minutes = intervals[i][0] + minute_selected
-        res.append(start + timedelta(minutes=actual_minutes))
+
+        timezone_time = LOCALTIMEZONE.localize(
+            start + timedelta(minutes=actual_minutes), is_dst=None
+        )
+        res.append(timezone_time)
 
         interval_deletion(
             intervals,
@@ -107,10 +117,10 @@ def register_task(filename, dt, taskname):
         pickle.dump(i + 1, f)
 
     task_trigger = (
-        f"New-ScheduledTaskTrigger -Once -At {dt.replace(microsecond=0).isoformat()}Z"
+        f"New-ScheduledTaskTrigger -Once -At {dt.replace(microsecond=0).isoformat()}"
     )
-    task_action = rf"New-ScheduledTaskAction -Execute \"PowerShell\" -Argument \".venv\Scripts\Activate.ps1; python {filename};\""
-    ps_command = rf'$taskTrigger = {task_trigger}; $taskAction = {task_action}; Register-ScheduledTask \"{taskname + " " + str(i)}\" -Action $taskAction -Trigger $taskTrigger -TaskPath \"PersonalPolling\";'
+    task_action = rf"New-ScheduledTaskAction -Execute \"PowerShell\" -Argument \".venv/Scripts/Activate.ps1; python {filename};\""
+    ps_command = rf'$taskTrigger = {task_trigger}; $taskAction = {task_action} -WorkingDirectory \"{BASE_PATH}\"; Register-ScheduledTask \"{taskname + " " + str(i)}\" -Action $taskAction -Trigger $taskTrigger -TaskPath \"PersonalPolling\";'
     with open("cache/log.txt", "a") as f:
         f.write(
             rf"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe {ps_command}"
@@ -130,7 +140,6 @@ def main():
 
     # TODO: for high frequency events, random.choice will scale too slowly
     for schedule in schedules:
-        file = os.path.join("api-calls", schedule["file"])
         repetition_dist = schedule["repetition-probs"]
         if schedule["frequency"] == "daily":
             days = list(pd.date_range(tomorrow, periods=7))
@@ -163,8 +172,10 @@ def main():
             raise NotImplementedError("Only daily schedules are currently supported")
 
         # TODO: implement scheduling here
+        filename = schedule["file"]
+        file_path = os.path.join("api-calls", filename)
         for dt in datetimes:
-            register_task(file, dt, f"Run {file}")
+            register_task(file_path, dt, f"Run {filename}")
 
 
 if __name__ == "__main__":

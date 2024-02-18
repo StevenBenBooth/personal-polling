@@ -1,13 +1,13 @@
 import json
 import os
 import subprocess
+import pickle
 import itertools
 import pandas as pd
 import numpy as np
 
 
-from datetime import datetime, date, time, timedelta
-
+from datetime import datetime, date, timedelta
 
 # TODO: reimplement interval handling with portion
 
@@ -91,30 +91,49 @@ def get_random_times(day, num=1, time_bounds=None, buffer=None):
 
 
 def register_task(filename, dt, taskname):
-    ps_time = dt.strftime("%I:%M%p").lower()
-    # Format %-I is invalid on windows
-    if ps_time[0] == "0":
-        ps_time = ps_time[1:]
+    # ps_time = dt.strftime("%I:%M%p").lower()
+    # # Format %-I is invalid on windows
+    # if ps_time[0] == "0":
+    #     ps_time = ps_time[1:]
 
-    ps_day = dt.strftime("%A")
-    task_trigger = f"New-ScheduledTaskTrigger -Once -DaysOfWeek {ps_day} -At {ps_time}"
-    task_action = f'New-ScheduledTaskAction -Execute "Powershell" -Argument "Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force .venv/Scripts/Activate.ps1; python {filename};" -WorkingDirectory $PSScriptRoot'
-    ps_command = f'$taskTrigger = {task_trigger}; $taskAction = {task_action}; Register-ScheduledTask "{taskname}" -Action $taskAction -Trigger $taskTrigger -TaskPath "PersonalPolling";'
-    subprocess.call(f"C:\Windows\System32\powershell.exe {ps_command}", shell=True)
+    # TODO: Come up with a less messy approach than this
+    # Ensures the task name is unique
+
+    # why broken?
+    pickle_path = os.path.join("cache", "unique_int.pk")
+    with open(pickle_path, "rb") as f:
+        i = pickle.load(f)
+    with open(pickle_path, "wb") as f:
+        pickle.dump(i + 1, f)
+
+    task_trigger = (
+        f"New-ScheduledTaskTrigger -Once -At {dt.replace(microsecond=0).isoformat()}Z"
+    )
+    task_action = rf"New-ScheduledTaskAction -Execute \"PowerShell\" -Argument \".venv\Scripts\Activate.ps1; python {filename};\""
+    ps_command = rf'$taskTrigger = {task_trigger}; $taskAction = {task_action}; Register-ScheduledTask \"{taskname + " " + str(i)}\" -Action $taskAction -Trigger $taskTrigger -TaskPath \"PersonalPolling\";'
+    with open("cache/log.txt", "a") as f:
+        f.write(
+            rf"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe {ps_command}"
+        )
+        f.write("\n")
+
+    subprocess.call(
+        rf"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe {ps_command}"
+    )
 
 
 def main():
     with open("schedules.json") as f:
         schedules = json.load(f)["schedule-info"]
 
-    today = date.today()
+    tomorrow = date.today() + timedelta(days=1)
 
     # TODO: for high frequency events, random.choice will scale too slowly
     for schedule in schedules:
         file = os.path.join("api-calls", schedule["file"])
         repetition_dist = schedule["repetition-probs"]
         if schedule["frequency"] == "daily":
-            days = list(pd.date_range(today, periods=7))
+            days = list(pd.date_range(tomorrow, periods=7))
 
             time_bounds = {
                 k: datetime.strptime(v, "%H%M").time()

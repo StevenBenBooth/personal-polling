@@ -21,7 +21,7 @@ def main():
                     "user": keys["user-key"],
                     "message": "Time to log your mood and energy",
                     "device": keys["device-name"],
-                    "url": r"https://forms.gle/ygJcKTtt4579TLoD7",
+                    "url": keys["poll-url"],
                     "url-title": "Poll Form",
                 }
             ),

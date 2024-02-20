@@ -7,6 +7,9 @@ KEYS_PATH = os.path.join(os.path.dirname(__file__), "..", "keys", "keys.json")
 
 
 def main():
+    with open(r"..\cache\log.txt", "a") as f:
+        f.write("Executed mood.py\n")
+
     with open(KEYS_PATH) as f:
         keys = json.load(f)
 

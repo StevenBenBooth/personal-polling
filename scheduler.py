@@ -1,19 +1,16 @@
 import json
 import os
-import subprocess
-import pickle
 import itertools
 import pandas as pd
 import numpy as np
 import pytz
 
+from psinterface import register_task
+
 
 from datetime import datetime, date, timedelta
 
 # TODO: reimplement interval handling with portion
-
-BASE_PATH = os.path.dirname(os.path.realpath(__file__))
-VENV_PATH = os.path.join(BASE_PATH, ".venv", "Scripts", "Activate.ps1")
 
 LOCALTIMEZONE = pytz.timezone("America/New_York")
 
@@ -100,38 +97,6 @@ def get_random_times(day, num=1, time_bounds=None, buffer=None):
     return res
 
 
-def register_task(filename, dt, taskname):
-    # ps_time = dt.strftime("%I:%M%p").lower()
-    # # Format %-I is invalid on windows
-    # if ps_time[0] == "0":
-    #     ps_time = ps_time[1:]
-
-    # TODO: Come up with a less messy approach than this
-    # Ensures the task name is unique
-
-    # why broken?
-    pickle_path = os.path.join("cache", "unique_int.pk")
-    with open(pickle_path, "rb") as f:
-        i = pickle.load(f)
-    with open(pickle_path, "wb") as f:
-        pickle.dump(i + 1, f)
-
-    task_trigger = (
-        f"New-ScheduledTaskTrigger -Once -At {dt.replace(microsecond=0).isoformat()}"
-    )
-    task_action = rf"New-ScheduledTaskAction -Execute \"PowerShell\" -Argument \".venv/Scripts/Activate.ps1; python {filename};\""
-    ps_command = rf'$taskTrigger = {task_trigger}; $taskAction = {task_action} -WorkingDirectory \"{BASE_PATH}\"; Register-ScheduledTask \"{taskname + " " + str(i)}\" -Action $taskAction -Trigger $taskTrigger -TaskPath \"PersonalPolling\";'
-    with open("cache/log.txt", "a") as f:
-        f.write(
-            rf"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe {ps_command}"
-        )
-        f.write("\n")
-
-    subprocess.call(
-        rf"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe {ps_command}"
-    )
-
-
 def main():
     with open("schedules.json") as f:
         schedules = json.load(f)["schedule-info"]
@@ -179,4 +144,6 @@ def main():
 
 
 if __name__ == "__main__":
+    with open("cache/log.txt", "a") as f:
+        f.write(str(datetime.now().replace(microsecond=None)) + "\n")
     main()

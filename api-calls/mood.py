@@ -3,11 +3,13 @@ import urllib
 import json
 import os
 
-KEYS_PATH = os.path.join(os.path.dirname(__file__), "..", "keys", "keys.json")
+BASE_PATH = os.path.dirname(__file__)
+KEYS_PATH = os.path.join(BASE_PATH, "..", "keys", "keys.json")
+LOG_PATH = os.path.join(BASE_PATH, "..", "cache", "log.txt")
 
 
 def main():
-    with open(r"..\cache\log.txt", "a") as f:
+    with open(LOG_PATH, "a") as f:
         f.write("Executed mood.py\n")
 
     with open(KEYS_PATH) as f:

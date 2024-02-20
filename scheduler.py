@@ -145,5 +145,5 @@ def main():
 
 if __name__ == "__main__":
     with open("cache/log.txt", "a") as f:
-        f.write(str(datetime.now().replace(microsecond=None)) + "\n")
+        f.write(str(datetime.now().replace(microsecond=0)) + "\n")
     main()
